@@ -1,0 +1,163 @@
+/*** Params setup ***/
+
+q:=2^8;
+v := 16;
+m := 10;
+
+__SEC_LEVEL__ := 1;
+
+if __SEC_LEVEL__ eq 3 then
+  v := 112;
+  m := 72;
+end if;
+
+if __SEC_LEVEL__ eq 5 then
+  v := 148;
+  m := 96;
+end if;
+
+n := v + m;
+K:=FiniteField(q);
+V:=VectorSpace(K,n);
+
+/*** Defining a tower of finite fields
+  using the moduli specified in
+  comments of the reference implementation
+  of MQ-Sign.
+GF2<u> := GF(2);
+RR<x> := PolynomialRing(GF2);
+GF4<z> := ext< GF2 | x^2+x+1 >;
+SS<y> := PolynomialRing(GF4);
+GF16<w> := ext< GF4 | y^2+y+z >;
+TT<X> := PolynomialRing(GF16);
+GF256<X> := ext< GF16 | X^2+X+z*w >;
+K := GF256;
+***/
+
+/*** END : Params setup ***/
+
+
+/*** Functions for MQ-Sign keygen ***/
+
+function V2(i, s)
+  return (((i+s-1) mod v)+1);
+end function;
+
+function O2(i, s)
+  return (((i+s-2) mod m)+v+1);
+end function;
+
+function Upper(M, nn)
+  for i in [1..nn] do
+    for j in [i+1..nn] do
+      M[i][j] +:= M[j][i];
+      M[j][i] := 0;
+    end for;
+  end for;
+  return M;
+end function;
+
+function MQSignCentralMap()
+  F := [];
+  for s in [1..m] do
+    M := ZeroMatrix(K,n,n);
+    for i in [1..v] do
+      M[i][V2(i, s)] := Random(K);
+      M[i][O2(i, s)] := Random(K);
+    end for;
+    M := Upper(M, n);
+    Append(~F, M);
+  end for;
+  return F;
+end function;
+
+function UpperTriangularS()
+  up := HorizontalJoin(IdentityMatrix(K, v), RandomMatrix(K, v, m));
+  down := HorizontalJoin(ZeroMatrix(K, m, v),IdentityMatrix(K, m));
+  S := VerticalJoin(up, down);
+  return S;
+end function;
+
+function GetPublicKey(F, S)
+  S := Submatrix(S, 1, v+1, v, m);
+  F1 := [Submatrix(F[s], 1, 1, v, v) : s in [1..m]];
+  F2 := [Submatrix(F[s], 1, v+1, v, m) : s in [1..m]];
+  P1 := [F1[s] : s in [1..m]];
+  P2 := [(F1[s] + Transpose(F1[s]))*S + F2[s] : s in [1..m]];
+  P3 := [Upper(Transpose(S)*F1[s]*S+Transpose(S)*F2[s], m) : s in [1..m]];
+  P := [VerticalJoin(HorizontalJoin(P1[s], P2[s]), HorizontalJoin(ZeroMatrix(K, m, v), P3[s])) : s in [1..m]];
+  return P;
+end function;
+
+/*** END : Functions for MQ-Sign keygen ***/
+
+
+
+/*** Functions used for the attack ***/
+
+function MQSignHeatMap(s)
+  H := ZeroMatrix(K,n,n);
+  for i in [1..v] do
+    H[i][V2(i, s)] := 1;
+    H[i][O2(i, s)] := 1;
+  end for;
+  H := Upper(H, n);
+  return H;
+end function;
+
+function GetSolution(P)
+  P1 := [Submatrix(P[s], 1, 1, v, v) : s in [1..m]];
+  P2 := [Submatrix(P[s], 1, v+1, v, m) : s in [1..m]];
+
+  P1_tilde := [P1[s] + Transpose(P1[s]) : s in [1..m]];
+  BigP := P1_tilde[1];
+  for s in [2..m] do
+    BigP := VerticalJoin(BigP, P1_tilde[s]);
+  end for;
+
+  H := [MQSignHeatMap(s) : s in [1..m]];
+  H2 := [Submatrix(H[s], 1, v+1, v, m) : s in [1..m]]; //Heat map of F2
+
+  cols := [];
+  for j in [1..m] do
+    b := Submatrix(P2[1], 1, j, v, 1);
+    for s in [2..m] do
+      b := VerticalJoin(b, Submatrix(P2[s], 1, j, v, 1));
+    end for;
+    A := BigP;
+    //remove non valid rows
+    cpt_removed := 0;
+    for s in [1..m] do
+    for i in [1..v] do
+        if H2[s][i][j] ne 0 then
+          RemoveRow(~A, (s-1)*v+i-cpt_removed);
+          RemoveRow(~b, (s-1)*v+i-cpt_removed);
+          cpt_removed +:= 1;
+        end if;
+      end for;
+    end for;
+    Append(~cols, Solution(Transpose(A), Transpose(b)));
+  end for;
+
+  S_sol := cols[1];
+  for j in [2..m] do
+    S_sol := VerticalJoin(S_sol, cols[j]);
+  end for;
+  S_sol := Transpose(S_sol);
+
+  return S_sol;
+end function;
+
+/*** END : Functions used for the attack ***/
+
+
+/*** MAIN ***/
+
+F := MQSignCentralMap();
+S := UpperTriangularS();
+P := GetPublicKey(F, S);
+
+S_sol := GetSolution(P);
+printf "Solution correct: %o\n", S_sol eq Submatrix(S, 1, v+1, v, m);
+
+/*** END : MAIN ***/
