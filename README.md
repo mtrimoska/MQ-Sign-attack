@@ -1,5 +1,7 @@
 # Practical key-recovery attack on MQ-Sign
-This reposity contains verification scripts and an explanatory note on a practical key-recovery attack on the MQ-Sign digital signature scheme, a candidate in the Korean Post-Quantum Cryptography Competition.
+This repository contains verification scripts on a practical key-recovery attack on the MQ-Sign digital signature scheme, a candidate in the Korean Post-Quantum Cryptography Competition.
+
+The corresponding paper: [2023/432](https://eprint.iacr.org/2023/432).
 
 This is joint work between [Thomas Aulbach](https://www.uni-regensburg.de/informatics-data-science/qpc/team/thomas-aulbach/index.html), [Simona Samardjiska](https://samardjiska.org/) and [myself](https://mtrimoska.com/).
 
