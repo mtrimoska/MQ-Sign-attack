@@ -1,0 +1,163 @@
+//all linear monomials in all variables in R
+function GetLinearMonomials(R)
+  monomials := [];
+  cpt := 1;
+  for i in [1..Rank(R)] do
+    monomials[cpt] := R.i;
+    cpt +:= 1;
+  end for;
+  return monomials;
+end function;
+
+//all odd-index variables in R
+function GetEvenLinearMonomials(R)
+  monomials := [];
+  cpt := 1;
+  for i in [2..Rank(R) by 2] do
+    monomials[cpt] := R.i;
+    cpt +:= 1;
+  end for;
+  return monomials;
+end function;
+
+//all quadratic monomials in all variables in R
+function GetQuadraticMonomials(R)
+  monomials := [];
+  cpt := 1;
+  for i in [1..Rank(R)] do
+    if q eq 2 then
+      ii := i - 1;
+    else
+      ii := i;
+    end if;
+    for j in [1..ii] do
+      monomials[cpt] := R.j*R.i;
+      cpt +:= 1;
+    end for;
+  end for;
+  return monomials;
+end function;
+
+//all quadratic monomials in variables in sequence vars
+function GetRemainingQuadraticMonomials(vars)
+  monomials := [];
+  cpt := 1;
+  for i in [1..#vars] do
+    if q eq 2 then
+      ii := i - 1;
+    else
+      ii := i;
+    end if;
+    for j in [1..ii] do
+      monomials[cpt] := vars[j]*vars[i];
+      cpt +:= 1;
+    end for;
+  end for;
+  return monomials;
+end function;
+
+//all cubic monomials in all variables in R
+function GetCubicMonomials(R)
+  monomials := [];
+  cpt := 1;
+  for i in [1..Rank(R)] do
+    if q eq 2 then
+      ii := i - 1;
+    else
+      ii := i;
+    end if;
+    for j in [1..ii] do
+      if q eq 2 then
+        jj := j - 1;
+      else
+        jj := j;
+      end if;
+      for z in [1..jj] do
+        monomials[cpt] := R.z*R.j*R.i;
+        cpt +:= 1;
+      end for;
+    end for;
+  end for;
+  return monomials;
+end function;
+
+function GetPlusMonomials(R, offset)
+  monomials := [];
+  cpt := 1;
+  for i in [offset+1..Rank(R)] do
+    if q eq 2 then
+      ii := i - 1;
+    else
+      ii := i;
+    end if;
+    for j in [offset+1..ii] do
+      if q eq 2 then
+        jj := j - 1;
+      else
+        jj := j;
+      end if;
+      for z in [offset+1..jj] do
+        monomials[cpt] := R.z*R.j*R.i;
+        cpt +:= 1;
+      end for;
+    end for;
+  end for;
+
+  for i in [offset+1..Rank(R)] do
+    if q eq 2 then
+      ii := i - 1;
+    else
+      ii := i;
+    end if;
+    for j in [offset+1..ii] do
+      monomials[cpt] := R.j*R.i;
+      cpt +:= 1;
+    end for;
+  end for;
+
+  for i in [offset+1..Rank(R)] do
+    monomials[cpt] := R.i;
+    cpt +:= 1;
+  end for;
+
+  return monomials;
+end function;
+
+// ordering depends on the list monomials
+function MQSpecificSystemToMacaulay(system, monomials)
+  MSpace := KMatrixSpace(K, #system, #monomials + 1);
+  M := ZeroMatrix(K, #system, #monomials + 1);
+  //fill matrix
+  for equation in [1..#system] do
+    for col in [1..#monomials] do
+      M[equation][col] := MonomialCoefficient(system[equation], monomials[col]);
+    end for;
+    // constant
+    if TrailingTerm(system[equation]) in K then
+      M[equation][#monomials + 1] := TrailingTerm(system[equation]);
+    end if;
+  end for;
+
+  M := MSpace ! M;
+  return M;
+end function;
+
+// ordering depends on the list monomials
+function MQMacaulayToSpecificSystem(M, monomials)
+  //M := EchelonForm(M);
+  has_constant := Ncols(M) gt #monomials;
+  system := [];
+
+  for row in [1..Rank(M)] do
+    new_eq := 0;
+    for col in [1..#monomials] do
+      new_eq := new_eq + M[row][col]*monomials[col];
+    end for;
+    // constant
+    if has_constant eq true then
+      new_eq := new_eq + M[row][#monomials + 1];
+    end if;
+    Append(~system, new_eq);
+  end for;
+  return system;
+end function;

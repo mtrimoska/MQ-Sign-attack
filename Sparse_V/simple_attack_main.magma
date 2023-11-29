@@ -1,0 +1,124 @@
+load "MQ-Sign_params.magma";
+
+n := v;
+nb_fixed_vars := v - m;
+nb_specialized_vars := Round(v/2) - (nb_fixed_vars);
+
+K:=FiniteField(q);
+V:=VectorSpace(K,n);
+
+load "utils.magma";
+load "params_setup.magma";
+load "attack_P1_sparse.magma";
+load "MQ-Sign.magma";
+
+R, X_ := RingGetConfig();
+F, S, P := GetMQSignInstance();
+x, y := GetSolutionVector(P, F, S);
+
+/** fix everything that we can fix for free  */
+// fix all oil variables
+X_ := [R.j : j in [1..v]] cat x[v+1..v+m];
+// fix some odd vinegar variables
+for j in [0..nb_fixed_vars-1] do
+  X_[2*j+1] := x[2*j+1];
+end for;
+/** */
+
+X_M := Transpose(Matrix(R, v+m, v+m, X_ cat [0 : j in [1..v+m], i in [1..v+m-1]]));
+system := GetSystemP([], P, X_M);
+for i in [1..m] do
+  system[i] := system[i] - y[i];
+end for;
+
+solution := Zero(V);
+
+// enumerate odd variables
+V_spec := VectorSpace(K, nb_specialized_vars);
+system_cpy := system;
+for spec_v in V_spec do
+  system := system_cpy;
+  spec := ElementToSequence(spec_v);
+
+  /** Set up the correct solution:
+  This is used to avoid the enumeration and check only the second part
+  of the attack. Remove this block of code to mount the whole attack.
+  **/
+  spec_real := ElementToSequence(spec_v);
+  z := 1;
+  for j in [nb_fixed_vars..nb_fixed_vars+nb_specialized_vars-1] do
+    spec[z] := x[2*j+1];
+    z := z + 1;
+  end for;
+  /** END: Set up the correct solution **/
+
+  z := 1;
+  for j in [nb_fixed_vars..nb_fixed_vars+nb_specialized_vars-1] do
+    for i in [1..#system] do
+      system[i] := Evaluate(system[i], j*2+1, spec[z]);
+    end for;
+    z := z + 1;
+  end for;
+  
+  // get linear subsystem
+  sub_system_linear := [];
+  for i in [1..m by 2] do
+    Append(~sub_system_linear, system[i]);
+  end for;
+
+  // get nonlinear subsystem
+  sub_system_mq := [];
+  for i in [2..m by 2] do
+    Append(~sub_system_mq, system[i]);
+  end for;
+
+  // get Mac matrix of linear sybsystem and Echelonize
+  ord := GetEvenLinearMonomials(R);
+  M := MQSpecificSystemToMacaulay(sub_system_linear, ord);
+  E := EchelonForm(M);
+  sub_system_linear := MQMacaulayToSpecificSystem(E, ord);
+
+  // substitution (works for any ord, but assumes sub_system_linear Echelonized by ord)
+  remaining_vars := ord;
+  j := 1;
+  for cpt in [1..#sub_system_linear] do
+    while MonomialCoefficient(sub_system_linear[cpt], ord[j]) ne 1 do
+      j := j + 1;
+    end while;
+    subs_equation := -(sub_system_linear[cpt] - ord[j]); // use '-' for general characteristic 
+    for i in [1..#sub_system_mq] do
+      sub_system_mq[i] := Evaluate(sub_system_mq[i], ord[j], subs_equation);
+    end for;
+    remaining_vars := Exclude(remaining_vars, ord[j]);
+    j := j + 1;
+  end for;
+
+  // transform system in fewer variables
+  ord := GetRemainingQuadraticMonomials(remaining_vars);
+  ord := ord cat remaining_vars;
+  M := MQSpecificSystemToMacaulay(sub_system_mq, ord);
+
+  R2 := PolynomialRing(K, Round((v-m)/2), "grevlex");
+  ord := GetQuadraticMonomials(R2);
+  ord := ord cat GetLinearMonomials(R2);
+  system2 := MQMacaulayToSpecificSystem(M, ord);
+
+  
+ // printf "Number of equations: %o\n", #system2;
+  SetVerbose("Groebner", 1);
+  I := Ideal(system2);
+  t := Cputime();
+  GB := GroebnerBasis(I);
+  runtime := Cputime() - t;
+  /*if #sols ne 0 then
+    print sols;
+    print spec;
+    break;
+  end if;*/
+  if #GB ne 1 then
+    printf "GB computation finished in %o", runtime;
+    print GB;
+    Variety(I);
+    break;
+  end if;
+end for;

@@ -1,0 +1,16 @@
+function GetSystemP1(system, P, X_)
+  P1 := [Submatrix(P[s], 1, 1, v, v) : s in [1..m]];
+  for s in [1..m] do
+    M := Transpose(X_)*P1[s]*X_; 
+    Append(~system, M[1][1]);
+  end for;
+  return system;
+end function;
+
+function GetSystemP(system, P, X_)
+  for s in [1..m] do
+    M := Transpose(X_)*P[s]*X_; 
+    Append(~system, M[1][1]);
+  end for;
+  return system;
+end function;

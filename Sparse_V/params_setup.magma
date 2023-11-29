@@ -1,0 +1,17 @@
+function RingGetConfig()
+  vars := ["x_" * IntegerToString(i) : i in [1..n] ];
+
+  R := PolynomialRing(K, n, "grevlex");
+  R_bool := BooleanPolynomialRing(n, "grevlex");
+  AssignNames(~R, vars);
+  AssignNames(~R_bool, vars);
+
+  // which field
+  if(q eq 2) then
+    R := R_bool;
+  end if;
+
+  X_ := Matrix(R, n, n, [R.j : j in [1..n]] cat [0 : j in [1..n], i in [1..n-1]]);
+
+  return R, Transpose(X_);
+end function;

@@ -1,0 +1,35 @@
+/*** Params setup ***/
+
+q := 2^8;
+v := 72;
+m := 46;
+
+__SEC_LEVEL__ := 1;
+
+if __SEC_LEVEL__ eq 3 then
+  v := 112;
+  m := 72;
+end if;
+
+if __SEC_LEVEL__ eq 5 then
+  v := 148;
+  m := 96;
+end if;
+
+n := v + m;
+
+/*** Defining a tower of finite fields
+  using the moduli specified in
+  comments of the reference implementation
+  of MQ-Sign.
+GF2<u> := GF(2);
+RR<x> := PolynomialRing(GF2);
+GF4<z> := ext< GF2 | x^2+x+1 >;
+SS<y> := PolynomialRing(GF4);
+GF16<w> := ext< GF4 | y^2+y+z >;
+TT<X> := PolynomialRing(GF16);
+GF256<X> := ext< GF16 | X^2+X+z*w >;
+K := GF256;
+***/
+
+/*** END : Params setup ***/
